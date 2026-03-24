@@ -1,16 +1,19 @@
 #![no_std]
 
 mod error;
-mod types;
-mod storage;
 mod htlc;
+mod optimization;
 mod order;
+mod storage;
 mod swap;
+mod types;
 
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String};
 
 use crate::error::Error;
-use crate::types::{HTLC, HTLCStatus, SwapOrder, CrossChainSwap, Chain, ChainProof};
+use crate::types::{
+    Chain, ChainProof, CrossChainSwap, HTLCStatus, StorageMetrics, SwapOrder, HTLC,
+};
 
 #[contract]
 pub struct ChainBridge;
@@ -32,7 +35,7 @@ impl ChainBridge {
         sender: Address,
         receiver: Address,
         amount: i128,
-        hash_lock: Bytes,
+        hash_lock: soroban_sdk::BytesN<32>,
         time_lock: u64,
     ) -> Result<u64, Error> {
         sender.require_auth();
@@ -51,11 +54,7 @@ impl ChainBridge {
     }
 
     /// Refund HTLC after timelock expires
-    pub fn refund_htlc(
-        env: Env,
-        sender: Address,
-        htlc_id: u64,
-    ) -> Result<(), Error> {
+    pub fn refund_htlc(env: Env, sender: Address, htlc_id: u64) -> Result<(), Error> {
         sender.require_auth();
         htlc::refund_htlc(&env, htlc_id, &sender)
     }
@@ -102,11 +101,7 @@ impl ChainBridge {
     }
 
     /// Match and execute a swap order
-    pub fn match_order(
-        env: Env,
-        counterparty: Address,
-        order_id: u64,
-    ) -> Result<u64, Error> {
+    pub fn match_order(env: Env, counterparty: Address, order_id: u64) -> Result<u64, Error> {
         counterparty.require_auth();
         order::match_order(&env, &counterparty, order_id)
     }
@@ -117,29 +112,18 @@ impl ChainBridge {
     }
 
     /// Cancel a swap order
-    pub fn cancel_order(
-        env: Env,
-        creator: Address,
-        order_id: u64,
-    ) -> Result<(), Error> {
+    pub fn cancel_order(env: Env, creator: Address, order_id: u64) -> Result<(), Error> {
         creator.require_auth();
         order::cancel_order(&env, &creator, order_id)
     }
 
     /// Verify cross-chain proof
-    pub fn verify_proof(
-        env: Env,
-        proof: ChainProof,
-    ) -> Result<bool, Error> {
+    pub fn verify_proof(env: Env, proof: ChainProof) -> Result<bool, Error> {
         swap::verify_chain_proof(&env, &proof)
     }
 
     /// Complete cross-chain swap
-    pub fn complete_swap(
-        env: Env,
-        swap_id: u64,
-        proof: ChainProof,
-    ) -> Result<(), Error> {
+    pub fn complete_swap(env: Env, swap_id: u64, proof: ChainProof) -> Result<(), Error> {
         swap::complete_cross_chain_swap(&env, swap_id, proof)
     }
 
@@ -149,17 +133,29 @@ impl ChainBridge {
     }
 
     /// Add supported chain (admin only)
-    pub fn add_chain(
-        env: Env,
-        admin: Address,
-        chain_id: u8,
-    ) -> Result<(), Error> {
+    pub fn add_chain(env: Env, admin: Address, chain_id: u32) -> Result<(), Error> {
         admin.require_auth();
         let stored_admin = storage::read_admin(&env);
         if admin != stored_admin {
             return Err(Error::Unauthorized);
         }
         storage::add_supported_chain(&env, chain_id);
+        Ok(())
+    }
+
+    /// Get storage metrics
+    pub fn get_storage_metrics(env: Env) -> StorageMetrics {
+        storage::get_storage_metrics(&env)
+    }
+
+    /// Cleanup expired HTLCs
+    pub fn cleanup_expired_htlcs(env: Env) -> u64 {
+        storage::cleanup_expired_htlcs(&env)
+    }
+
+    /// Mark HTLC for cleanup
+    pub fn mark_htlc_expired(env: Env, htlc_id: u64) -> Result<(), Error> {
+        storage::add_expired_htlc(&env, htlc_id);
         Ok(())
     }
 }

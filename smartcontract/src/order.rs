@@ -75,6 +75,6 @@ pub fn cancel_order(env: &Env, creator: &Address, order_id: u64) -> Result<(), E
         return Err(Error::OrderAlreadyMatched);
     }
 
-    // Remove order from storage (set expiry to 0 to mark as cancelled)
+    storage::remove_order(env, order_id);
     Ok(())
 }

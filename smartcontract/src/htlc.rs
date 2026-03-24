@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::storage;
 use crate::types::{HTLCStatus, HTLC};
-use soroban_sdk::{Address, Bytes, Env};
+use soroban_sdk::{Address, Bytes, BytesN, Env};
 
 const HASH_LENGTH: usize = 32; // SHA256 hash length
 
@@ -10,14 +10,14 @@ pub fn create_htlc(
     sender: &Address,
     receiver: &Address,
     amount: i128,
-    hash_lock: Bytes,
+    hash_lock: BytesN<32>,
     time_lock: u64,
 ) -> Result<u64, Error> {
     if amount <= 0 {
         return Err(Error::InvalidAmount);
     }
 
-    if hash_lock.len() != HASH_LENGTH {
+    if hash_lock.len() != HASH_LENGTH as u32 {
         return Err(Error::InvalidHashLength);
     }
 
@@ -57,6 +57,7 @@ pub fn claim_htlc(env: &Env, htlc_id: u64, secret: Bytes) -> Result<(), Error> {
 
     // Verify secret matches hash
     let computed_hash = env.crypto().sha256(&secret);
+    let computed_hash: BytesN<32> = env.crypto().sha256(&secret).into();
     if computed_hash != htlc.hash_lock {
         return Err(Error::InvalidSecret);
     }
@@ -88,6 +89,20 @@ pub fn refund_htlc(env: &Env, htlc_id: u64, sender: &Address) -> Result<(), Erro
     storage::write_htlc(env, htlc_id, &htlc);
 
     Ok(())
+}
+
+pub fn check_and_mark_expired(env: &Env, htlc_id: u64) -> Result<bool, Error> {
+    let htlc = storage::read_htlc(env, htlc_id).ok_or(Error::HTLCNotFound)?;
+
+    if htlc.status == HTLCStatus::Active {
+        let current_time = env.ledger().timestamp();
+        if current_time >= htlc.time_lock {
+            storage::add_expired_htlc(env, htlc_id);
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 pub fn get_htlc_status(env: &Env, htlc_id: u64) -> Result<HTLCStatus, Error> {
