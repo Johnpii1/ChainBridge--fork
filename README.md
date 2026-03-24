@@ -259,13 +259,22 @@ docker-compose -f docker-compose.dev.yml --profile admin up -d
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and customize:
+ChainBridge uses environment variables for configuration. See the detailed documentation at [Configuration Guide](./docs/CONFIG.md).
+
+#### Quick Setup
 
 ```bash
+# Copy example files and customize
 cp .env.example .env
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+cp relayer/.env.example relayer/.env
+
+# Validate configuration
+./scripts/validate-env.sh
 ```
 
-Key environment variables:
+#### Key Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -273,8 +282,26 @@ Key environment variables:
 | `POSTGRES_PASSWORD` | chainbridge_dev | PostgreSQL password |
 | `POSTGRES_DB` | chainbridge | Database name |
 | `REDIS_PASSWORD` | chainbridge_redis_dev | Redis password |
-| `DEBUG` | true | Enable debug mode |
+| `DEBUG` | false | Enable debug mode |
 | `CORS_ORIGINS` | http://localhost:3000 | Allowed CORS origins |
+| `STELLAR_NETWORK` | testnet | Stellar network (testnet/mainnet) |
+| `ETHEREUM_NETWORK` | testnet | Ethereum network (testnet/mainnet) |
+| `BITCOIN_NETWORK` | testnet | Bitcoin network (testnet/mainnet) |
+
+#### Configuration Files
+
+- **Root**: `.env` - Docker Compose and shared configuration
+- **Backend**: `backend/.env` - Backend application settings
+- **Frontend**: `frontend/.env.local` - Frontend settings
+- **Relayer**: `relayer/.env` - Relayer service settings
+
+#### RPC Endpoints
+
+See [RPC Configuration](./docs/RPC.md) for detailed endpoint setup.
+
+#### Secrets Management
+
+Never commit secrets to version control. See [Secrets Management Guide](./docs/SECRETS.md) for best practices.
 
 ### Docker Commands Reference
 

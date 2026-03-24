@@ -7,7 +7,7 @@ edition = "2021"
 tokio = { version = "1.35", features = ["full"] }
 bitcoin = "0.31"
 ethers = "2.0"
-stellar-sdk = "0.11"
+stellar_sdk = "0.11"
 sha2 = "0.10"
 hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
