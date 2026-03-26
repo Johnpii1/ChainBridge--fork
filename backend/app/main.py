@@ -1,11 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
+from app.config.redis import init_redis, close_redis
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.routes import api_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_redis()
+    yield
+    await close_redis()
+
+
 app = FastAPI(
     title="ChainBridge API",
     description="Backend API for ChainBridge cross-chain atomic swaps",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -16,14 +31,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(RateLimitMiddleware)
+
+app.include_router(api_router)
+
 
 @app.get("/")
 async def root():
-    return {
-        "name": "ChainBridge API",
-        "version": "0.1.0",
-        "status": "running"
-    }
+    return {"name": "ChainBridge API", "version": "0.1.0", "status": "running"}
 
 
 @app.get("/health")
@@ -37,5 +52,5 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", 8000)),
-        reload=os.getenv("DEBUG", "false").lower() == "true"
+        reload=os.getenv("DEBUG", "false").lower() == "true",
     )

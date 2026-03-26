@@ -1,0 +1,13 @@
+from fastapi import APIRouter
+from .htlc import router as htlc_router
+from .orders import router as orders_router
+from .swaps import router as swaps_router
+from .auth import router as auth_router
+from .analytics import router as analytics_router
+
+api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(htlc_router, prefix="/htlcs", tags=["HTLCs"])
+api_router.include_router(orders_router, prefix="/orders", tags=["Orders"])
+api_router.include_router(swaps_router, prefix="/swaps", tags=["Swaps"])
+api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
