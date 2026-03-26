@@ -90,6 +90,11 @@ export interface Order {
   chainOut: string;
   status: OrderStatus;
   timestamp: string;
+  orderType?: AdvancedOrderType;
+  triggerPrice?: string;
+  expiresAt?: string;
+  allowPartialFills?: boolean;
+  amendmentCount?: number;
 }
 
 export interface OrderBookStore {
@@ -97,4 +102,36 @@ export interface OrderBookStore {
   addOrder: (order: Order) => void;
   updateOrder: (id: string, updates: Partial<Order>) => void;
   removeOrder: (id: string) => void;
+}
+
+export enum AdvancedOrderType {
+  MARKET = "market",
+  LIMIT = "limit",
+  TWAP = "twap",
+  STOP_LOSS = "stop_loss",
+}
+
+export interface GovernanceProposal {
+  id: string;
+  title: string;
+  proposer: string;
+  status: "active" | "succeeded" | "executed" | "defeated";
+  participation: string;
+  executableAt: string;
+}
+
+export interface LiquidityPool {
+  id: string;
+  pair: string;
+  tvl: string;
+  apr: string;
+  feeTier: string;
+  utilization: string;
+}
+
+export interface ReferralCampaign {
+  code: string;
+  referrals: number;
+  rewards: string;
+  conversionRate: string;
 }

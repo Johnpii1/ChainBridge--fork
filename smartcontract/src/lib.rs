@@ -2,9 +2,12 @@
 
 mod crypto;
 mod error;
+mod governance;
 mod htlc;
+mod liquidity;
 mod optimization;
 mod order;
+mod referral;
 mod storage;
 mod swap;
 mod types;
@@ -13,8 +16,9 @@ use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, V
 
 use crate::error::Error;
 use crate::types::{
-    Chain, ChainProof, CrossChainSwap, HTLCStatus, HashAlgorithm, OptMultiSig, StorageMetrics,
-    SwapOrder, HTLC,
+    AdvancedOrderType, Chain, ChainProof, CrossChainSwap, GovernanceConfig, GovernanceProposal,
+    HTLCStatus, HashAlgorithm, LiquidityPool, LiquidityPosition, OrderExecutionCondition,
+    ReferralRecord, StorageMetrics, SwapOrder, VoteChoice, HTLC,
 };
 
 #[contract]
@@ -270,6 +274,40 @@ impl ChainBridge {
             to_amount,
             expiry,
             min_fill_amount,
+            AdvancedOrderType::Market,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_advanced_order(
+        env: Env,
+        creator: Address,
+        from_chain: Chain,
+        to_chain: Chain,
+        from_asset: String,
+        to_asset: String,
+        from_amount: i128,
+        to_amount: i128,
+        expiry: u64,
+        min_fill_amount: i128,
+        order_type: AdvancedOrderType,
+        execution: Option<OrderExecutionCondition>,
+    ) -> Result<u64, Error> {
+        creator.require_auth();
+        order::create_advanced_order(
+            &env,
+            &creator,
+            from_chain,
+            to_chain,
+            from_asset,
+            to_asset,
+            from_amount,
+            to_amount,
+            expiry,
+            min_fill_amount,
+            order_type,
+            execution,
         )
     }
 
@@ -296,6 +334,118 @@ impl ChainBridge {
     /// Return all open order IDs for a given chain pair.
     pub fn get_orders_by_chain_pair(env: Env, from_chain: Chain, to_chain: Chain) -> Vec<u64> {
         storage::get_orders_by_chain_pair(&env, &from_chain, &to_chain)
+    }
+
+    pub fn amend_order(
+        env: Env,
+        creator: Address,
+        order_id: u64,
+        to_amount: i128,
+        expiry: u64,
+        execution: Option<OrderExecutionCondition>,
+    ) -> Result<(), Error> {
+        creator.require_auth();
+        order::amend_order(&env, &creator, order_id, to_amount, expiry, execution)
+    }
+
+    pub fn init_governance(env: Env, admin: Address, config: GovernanceConfig) -> Result<(), Error> {
+        admin.require_auth();
+        if admin != storage::read_admin(&env) {
+            return Err(Error::Unauthorized);
+        }
+        governance::init_governance(&env, config)
+    }
+
+    pub fn create_proposal(
+        env: Env,
+        proposer: Address,
+        title: String,
+        description: String,
+        actions: Vec<String>,
+        voting_power: i128,
+    ) -> Result<u64, Error> {
+        proposer.require_auth();
+        governance::create_proposal(&env, &proposer, title, description, actions, voting_power)
+    }
+
+    pub fn cast_vote(
+        env: Env,
+        voter: Address,
+        proposal_id: u64,
+        choice: VoteChoice,
+        voting_power: i128,
+    ) -> Result<(), Error> {
+        voter.require_auth();
+        governance::cast_vote(&env, &voter, proposal_id, choice, voting_power)
+    }
+
+    pub fn execute_proposal(env: Env, proposal_id: u64) -> Result<(), Error> {
+        governance::execute_proposal(&env, proposal_id)
+    }
+
+    pub fn get_proposal(env: Env, proposal_id: u64) -> Result<GovernanceProposal, Error> {
+        storage::read_proposal(&env, proposal_id).ok_or(Error::OrderNotFound)
+    }
+
+    pub fn delegate_votes(env: Env, delegator: Address, delegatee: Address) -> Result<(), Error> {
+        delegator.require_auth();
+        governance::delegate_votes(&env, &delegator, &delegatee)
+    }
+
+    pub fn create_pool(
+        env: Env,
+        asset_a: String,
+        asset_b: String,
+        fee_bps: u32,
+        reward_bps: u32,
+    ) -> Result<u64, Error> {
+        liquidity::create_pool(&env, asset_a, asset_b, fee_bps, reward_bps)
+    }
+
+    pub fn add_liquidity(
+        env: Env,
+        provider: Address,
+        pool_id: u64,
+        amount_a: i128,
+        amount_b: i128,
+    ) -> Result<i128, Error> {
+        provider.require_auth();
+        liquidity::add_liquidity(&env, &provider, pool_id, amount_a, amount_b)
+    }
+
+    pub fn get_pool(env: Env, pool_id: u64) -> Result<LiquidityPool, Error> {
+        storage::read_pool(&env, pool_id).ok_or(Error::OrderNotFound)
+    }
+
+    pub fn get_position(env: Env, pool_id: u64, provider: Address) -> Result<LiquidityPosition, Error> {
+        storage::read_position(&env, pool_id, &provider).ok_or(Error::OrderNotFound)
+    }
+
+    pub fn get_pool_quote(
+        env: Env,
+        asset_in: String,
+        asset_out: String,
+        amount_in: i128,
+    ) -> Result<i128, Error> {
+        liquidity::get_pool_quote(&env, asset_in, asset_out, amount_in)
+    }
+
+    pub fn register_referral_code(env: Env, owner: Address, code: String) -> Result<(), Error> {
+        owner.require_auth();
+        referral::register_referral_code(&env, &owner, code)
+    }
+
+    pub fn record_referral_swap(
+        env: Env,
+        code: String,
+        swap_id: u64,
+        notional_amount: i128,
+    ) -> Result<(), Error> {
+        referral::record_referral_swap(&env, code, swap_id, notional_amount)
+    }
+
+    pub fn get_referral_record(env: Env, code: String) -> Result<ReferralRecord, Error> {
+        storage::read_referral_record(&env, &code).ok_or(Error::OrderNotFound)
     }
 }
 

@@ -4,8 +4,9 @@ import { useState, useMemo, useEffect } from "react";
 
 import { Transaction, TransactionStatus } from "@/types";
 import { Search, Download, RefreshCcw, Database, CheckCircle2, Clock, AlertCircle, ChevronRight, ExternalLink, ShieldCheck } from "lucide-react";
-import { Input, Button, Card, Badge, Spinner } from "@/components/ui";
+import { Input, Button, Badge, Spinner } from "@/components/ui";
 import { TransactionRow } from "./TransactionRow";
+import { TransactionDetailModal } from "./TransactionDetailModal";
 import { clsx } from "clsx";
 
 interface TransactionFeedProps {
@@ -18,6 +19,7 @@ export function TransactionFeed({ transactions, isLoading }: TransactionFeedProp
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | "all">("all");
   const [chainFilter, setChainFilter] = useState<string | "all">("all");
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -133,17 +135,30 @@ export function TransactionFeed({ transactions, isLoading }: TransactionFeedProp
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-background/50 backdrop-blur-sm overflow-hidden">
+      <div className="rounded-2xl border border-border bg-background/50 backdrop-blur-sm overflow-hidden shadow-glow-sm">
         {isLoading ? (
           <div className="flex h-64 flex-col items-center justify-center gap-4">
             <Spinner size="lg" />
             <p className="text-sm text-text-secondary">Syncing with history nodes...</p>
           </div>
         ) : filteredTransactions.length > 0 ? (
-          <div className="divide-y divide-border/50">
-            {filteredTransactions.map((tx) => (
-              <TransactionRow key={tx.id} tx={tx} />
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="hidden md:table-header-group">
+                <tr className="border-b border-border/50 bg-surface-overlay/30">
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-text-muted">Type / Status</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-text-muted">Asset</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-text-muted">Hash</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-text-muted text-right">Progress</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-text-muted text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {filteredTransactions.map((tx) => (
+                  <TransactionRow key={tx.id} tx={tx} onSelect={() => setSelectedTx(tx)} />
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="flex h-64 flex-col items-center justify-center gap-4 text-center px-4">
@@ -162,6 +177,13 @@ export function TransactionFeed({ transactions, isLoading }: TransactionFeedProp
           </div>
         )}
       </div>
+
+      {selectedTx && (
+        <TransactionDetailModal 
+          tx={selectedTx} 
+          onClose={() => setSelectedTx(null)} 
+        />
+      )}
 
       <div className="flex flex-col gap-4 rounded-xl bg-brand-500/5 border border-brand-500/10 p-4 md:flex-row md:items-center md:gap-8">
         <div className="flex items-center gap-3">

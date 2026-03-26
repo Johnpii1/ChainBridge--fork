@@ -32,8 +32,10 @@ async def create_order(data: OrderCreate, db: AsyncSession = Depends(get_db), _=
     await db.commit()
     await db.refresh(order)
 
-    cache = CacheService(get_redis())
     await cache.invalidate_pattern(f"orders:{data.from_chain}:{data.to_chain}:*")
+    
+    # Broadcast update (#30)
+    await get_redis().publish("cb:orders", json.dumps(OrderResponse.model_validate(order).model_dump(), default=str))
 
     return OrderResponse.model_validate(order)
 
@@ -96,8 +98,10 @@ async def match_order(
         order.filled_amount = data.fill_amount
     await db.commit()
 
-    cache = CacheService(get_redis())
     await cache.invalidate_pattern("orders:*")
+    
+    # Broadcast update (#30)
+    await get_redis().publish("cb:orders", json.dumps(OrderResponse.model_validate(order).model_dump(), default=str))
 
     return OrderResponse.model_validate(order)
 
@@ -114,7 +118,9 @@ async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db), _=Depe
     order.status = "cancelled"
     await db.commit()
 
-    cache = CacheService(get_redis())
     await cache.invalidate_pattern("orders:*")
+    
+    # Broadcast update (#30)
+    await get_redis().publish("cb:orders", json.dumps(OrderResponse.model_validate(order).model_dump(), default=str))
 
     return OrderResponse.model_validate(order)

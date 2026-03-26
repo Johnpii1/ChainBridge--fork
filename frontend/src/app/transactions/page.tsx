@@ -53,11 +53,11 @@ export default function TransactionsPage() {
           confirmations: 0,
           requiredConfirmations: 3,
           timestamp: new Date().toISOString(),
-        }
+        },
       ];
-      mocks.forEach(t => addTransaction(t));
+      mocks.forEach((t) => addTransaction(t));
     }
-  }, []); // Run ONLY once on mount
+  }, [addTransaction, transactions.length]);
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-12 md:py-20 animate-fade-in">
@@ -72,21 +72,21 @@ export default function TransactionsPage() {
             Transaction Explorer
           </h1>
           <p className="mt-4 text-lg text-text-secondary leading-relaxed max-w-2xl">
-            Real-time monitoring of your cross-chain atomic swaps and native asset transfers. 
-            All proofs are verified against chain state.
+            Real-time monitoring of your cross-chain atomic swaps and native asset transfers. All
+            proofs are verified against chain state.
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 md:flex">
-          <StatCard 
-            label="Total Swaps" 
-            value={transactions.length.toString()} 
-            icon={<Zap className="h-4 w-4 text-brand-500" />} 
+          <StatCard
+            label="Total Swaps"
+            value={transactions.length.toString()}
+            icon={<Zap className="h-4 w-4 text-brand-500" />}
           />
-          <StatCard 
-            label="Verified Proofs" 
-            value={transactions.filter(t => t.proofVerified).length.toString()} 
-            icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />} 
+          <StatCard
+            label="Verified Proofs"
+            value={transactions.filter((t) => t.proofVerified).length.toString()}
+            icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />}
           />
         </div>
       </div>
@@ -103,9 +103,7 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
         {icon}
         {label}
       </div>
-      <div className="text-2xl font-black text-text-primary">
-        {value}
-      </div>
+      <div className="text-2xl font-black text-text-primary">{value}</div>
     </div>
   );
 }

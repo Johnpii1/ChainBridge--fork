@@ -7,12 +7,22 @@ import os
 from app.config.redis import init_redis, close_redis
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.routes import api_router
+from app.stellar import StellarClient, StellarConfig
+
+
+from app.ws.manager import ConnectionManager
+from app.routes.ws import router as ws_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_redis()
+    # Initialize and start WebSocket manager
+    app.state.ws_manager = ConnectionManager(get_redis())
+    app.state.ws_manager.start()
     yield
+    # Stop WebSocket manager
+    await app.state.ws_manager.stop()
     await close_redis()
 
 
@@ -34,6 +44,11 @@ app.add_middleware(
 app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_router)
+app.include_router(ws_router, prefix="/api/v1", tags=["WebSocket"])
+
+# Initialize Stellar client
+stellar_config = StellarConfig.from_env()
+stellar_client = StellarClient(stellar_config)
 
 
 @app.get("/")
@@ -43,7 +58,29 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    stellar_health = await stellar_client.health_check()
+    return {
+        "status": "healthy",
+        "stellar": stellar_health,
+    }
+
+
+@app.get("/stellar/latest-ledger")
+async def latest_ledger():
+    ledger = await stellar_client.get_latest_ledger()
+    return {"latest_ledger": ledger}
+
+
+@app.get("/stellar/events")
+async def contract_events(start_ledger: int, limit: int = 100):
+    events = await stellar_client.get_contract_events(start_ledger, limit)
+    return {"events": events, "count": len(events)}
+
+
+@app.get("/stellar/transaction/{tx_hash}")
+async def transaction_status(tx_hash: str):
+    status = await stellar_client.get_transaction_status(tx_hash)
+    return status
 
 
 if __name__ == "__main__":

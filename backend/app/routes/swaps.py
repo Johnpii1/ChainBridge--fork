@@ -68,5 +68,9 @@ async def verify_proof(
 
     cache = CacheService(get_redis())
     await cache.delete(f"swap:{swap_id}")
+    
+    # Broadcast update (#30)
+    import json
+    await get_redis().publish(f"cb:swap:{swap_id}", json.dumps({"status": "verified", "swap_id": str(swap.id), "state": swap.state}))
 
     return {"status": "verified", "swap_id": str(swap.id), "state": swap.state}

@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Card, Button, Input, Badge, CardHeader, CardContent, CardFooter } from "@/components/ui";
-import { ArrowRightLeft, Settings, Info, AlertCircle } from "lucide-react";
+import { ArrowRightLeft, Settings, Info, AlertCircle, Share2, Vote, Waves } from "lucide-react";
 import { useWalletStore } from "@/hooks/useWallet";
 
 export default function SwapPage() {
   const { isConnected } = useWalletStore();
   const [amount, setAmount] = useState("");
+  const [orderType, setOrderType] = useState<"market" | "limit" | "twap">("limit");
 
   return (
     <div className="container mx-auto max-w-2xl px-4 py-12 md:py-20 animate-fade-in">
@@ -91,6 +93,36 @@ export default function SwapPage() {
               <span className="text-text-muted">Timelock Duration</span>
               <span className="text-text-primary font-medium">24 Hours</span>
             </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-text-muted">Order Mode</span>
+              <span className="text-text-primary font-medium uppercase">{orderType}</span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-text-primary">Advanced Execution</span>
+              <Badge variant="info">Issue #78</Badge>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              {["limit", "market", "twap"].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setOrderType(mode as "market" | "limit" | "twap")}
+                  className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
+                    orderType === mode
+                      ? "border-brand-500 bg-brand-500/10 text-brand-500"
+                      : "border-border bg-surface-overlay/30 text-text-secondary"
+                  }`}
+                >
+                  {mode === "twap" ? "TWAP schedule" : `${mode} order`}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-text-muted">
+              Configure triggers, partial fills, and expiry windows from the protocol workspace.
+            </p>
           </div>
 
           {!isConnected && (
@@ -102,8 +134,8 @@ export default function SwapPage() {
         </CardContent>
 
         <CardFooter className="bg-surface-overlay/30">
-          <Button 
-            className="w-full h-12 rounded-xl text-lg font-bold" 
+          <Button
+            className="w-full h-12 rounded-xl text-lg font-bold"
             disabled={!isConnected || !amount}
           >
             {isConnected ? "Initialize Atomic Swap" : "Connect Wallet to Swap"}
@@ -116,11 +148,50 @@ export default function SwapPage() {
         <div>
           <h4 className="font-semibold text-text-primary mb-1">How it works?</h4>
           <p>
-            Your assets are locked in a smart contract (HTLC) and can only be released 
-            if the recipient provides a secret hash. This ensures both parties either 
-            receive their funds or get a full refund if the swap expires.
+            Your assets are locked in a smart contract (HTLC) and can only be released if the
+            recipient provides a secret hash. This ensures both parties either receive their funds
+            or get a full refund if the swap expires.
           </p>
         </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <Link
+          href="/protocol"
+          className="rounded-2xl border border-border bg-surface-overlay/30 p-5 transition hover:border-brand-500/40"
+        >
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">
+            <Vote className="h-5 w-5" />
+          </div>
+          <h3 className="font-semibold text-text-primary">Governance</h3>
+          <p className="mt-2 text-sm text-text-secondary">
+            Review proposals, delegation, and queued executions.
+          </p>
+        </Link>
+        <Link
+          href="/protocol"
+          className="rounded-2xl border border-border bg-surface-overlay/30 p-5 transition hover:border-brand-500/40"
+        >
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">
+            <Waves className="h-5 w-5" />
+          </div>
+          <h3 className="font-semibold text-text-primary">Liquidity Pools</h3>
+          <p className="mt-2 text-sm text-text-secondary">
+            Inspect fallback AMM routes and LP rewards before submission.
+          </p>
+        </Link>
+        <Link
+          href="/protocol"
+          className="rounded-2xl border border-border bg-surface-overlay/30 p-5 transition hover:border-brand-500/40"
+        >
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">
+            <Share2 className="h-5 w-5" />
+          </div>
+          <h3 className="font-semibold text-text-primary">Share & Earn</h3>
+          <p className="mt-2 text-sm text-text-secondary">
+            Generate referral links, QR codes, and performance analytics.
+          </p>
+        </Link>
       </div>
     </div>
   );
