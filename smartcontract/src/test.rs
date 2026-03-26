@@ -1,13 +1,16 @@
 #![cfg(test)]
 
 use super::*;
+use crate::types::HashAlgorithm;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
-    Address, Bytes, Env, String,
+    Address, Bytes, BytesN, Env, String,
 };
 
 fn setup_contract() -> (Env, Address, ChainBridgeClient<'static>) {
     let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1_000_000);
     let contract_id = env.register_contract(None, ChainBridge);
     let client = ChainBridgeClient::new(&env, &contract_id);
     (env, contract_id, client)
@@ -23,7 +26,7 @@ fn create_test_htlc(
     duration_secs: u64,
 ) -> u64 {
     let secret = Bytes::from_slice(env, secret_bytes);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + duration_secs;
     client.create_htlc(sender, receiver, &amount, &hash_lock, &time_lock)
 }
@@ -37,12 +40,11 @@ fn test_init_success() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
 
-    let result = client.init(&admin);
-    assert!(result.is_ok());
+    client.init(&admin);
 }
 
 #[test]
-#[should_panic(expected = "AlreadyInitialized")]
+#[should_panic(expected = "Error(Contract, #1)")]
 fn test_error_already_initialized() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -56,7 +58,7 @@ fn test_error_already_initialized() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "InvalidAmount")]
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_error_invalid_amount_zero_htlc() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -66,14 +68,14 @@ fn test_error_invalid_amount_zero_htlc() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     client.create_htlc(&sender, &receiver, &0, &hash_lock, &time_lock);
 }
 
 #[test]
-#[should_panic(expected = "InvalidAmount")]
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_error_invalid_amount_negative_htlc() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -83,14 +85,14 @@ fn test_error_invalid_amount_negative_htlc() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     client.create_htlc(&sender, &receiver, &-1000, &hash_lock, &time_lock);
 }
 
 #[test]
-#[should_panic(expected = "InvalidAmount")]
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_error_invalid_amount_zero_order() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -113,64 +115,11 @@ fn test_error_invalid_amount_zero_order() {
 }
 
 // =============================================================================
-// HASH LENGTH ERROR TESTS
-// =============================================================================
-
-#[test]
-#[should_panic(expected = "InvalidHashLength")]
-fn test_error_invalid_hash_length_too_short() {
-    let (env, _, client) = setup_contract();
-    let admin = Address::generate(&env);
-    let sender = Address::generate(&env);
-    let receiver = Address::generate(&env);
-
-    client.init(&admin);
-
-    let short_hash = Bytes::from_slice(&env, &[1u8; 16]);
-    let time_lock = env.ledger().timestamp() + 86400;
-
-    client.create_htlc(&sender, &receiver, &1000, &short_hash, &time_lock);
-}
-
-#[test]
-#[should_panic(expected = "InvalidHashLength")]
-fn test_error_invalid_hash_length_too_long() {
-    let (env, _, client) = setup_contract();
-    let admin = Address::generate(&env);
-    let sender = Address::generate(&env);
-    let receiver = Address::generate(&env);
-
-    client.init(&admin);
-
-    let long_hash = Bytes::from_slice(&env, &[1u8; 64]);
-    let time_lock = env.ledger().timestamp() + 86400;
-
-    client.create_htlc(&sender, &receiver, &1000, &long_hash, &time_lock);
-}
-
-#[test]
-fn test_valid_hash_length_32_bytes() {
-    let (env, _, client) = setup_contract();
-    let admin = Address::generate(&env);
-    let sender = Address::generate(&env);
-    let receiver = Address::generate(&env);
-
-    client.init(&admin);
-
-    let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
-    let time_lock = env.ledger().timestamp() + 86400;
-
-    let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
-    assert!(htlc_id > 0);
-}
-
-// =============================================================================
 // TIMELOCK ERROR TESTS
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "InvalidTimelock")]
+#[should_panic(expected = "Error(Contract, #12)")]
 fn test_error_invalid_timelock_past() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -180,14 +129,14 @@ fn test_error_invalid_timelock_past() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let past_time = env.ledger().timestamp() - 100;
 
     client.create_htlc(&sender, &receiver, &1000, &hash_lock, &past_time);
 }
 
 #[test]
-#[should_panic(expected = "InvalidTimelock")]
+#[should_panic(expected = "Error(Contract, #12)")]
 fn test_error_invalid_timelock_now() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -197,14 +146,14 @@ fn test_error_invalid_timelock_now() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let now = env.ledger().timestamp();
 
     client.create_htlc(&sender, &receiver, &1000, &hash_lock, &now);
 }
 
 #[test]
-#[should_panic(expected = "InvalidTimelock")]
+#[should_panic(expected = "Error(Contract, #12)")]
 fn test_error_invalid_order_expiry_past() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -231,7 +180,7 @@ fn test_error_invalid_order_expiry_past() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "HTLCNotFound")]
+#[should_panic(expected = "Error(Contract, #5)")]
 fn test_error_htlc_not_found_get() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -242,7 +191,7 @@ fn test_error_htlc_not_found_get() {
 }
 
 #[test]
-#[should_panic(expected = "HTLCNotFound")]
+#[should_panic(expected = "Error(Contract, #5)")]
 fn test_error_htlc_not_found_claim() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -255,7 +204,7 @@ fn test_error_htlc_not_found_claim() {
 }
 
 #[test]
-#[should_panic(expected = "HTLCNotFound")]
+#[should_panic(expected = "Error(Contract, #5)")]
 fn test_error_htlc_not_found_refund() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -271,7 +220,7 @@ fn test_error_htlc_not_found_refund() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "Unauthorized")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_error_unauthorized_refund_wrong_sender() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -289,7 +238,7 @@ fn test_error_unauthorized_refund_wrong_sender() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_error_unauthorized_cancel_order_wrong_creator() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -314,7 +263,7 @@ fn test_error_unauthorized_cancel_order_wrong_creator() {
 }
 
 #[test]
-#[should_panic(expected = "Unauthorized")]
+#[should_panic(expected = "Error(Contract, #3)")]
 fn test_error_unauthorized_add_chain() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -330,7 +279,7 @@ fn test_error_unauthorized_add_chain() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "InvalidSecret")]
+#[should_panic(expected = "Error(Contract, #8)")]
 fn test_error_invalid_secret_wrong_secret() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -340,7 +289,7 @@ fn test_error_invalid_secret_wrong_secret() {
     client.init(&admin);
 
     let original_secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&original_secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&original_secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -350,7 +299,7 @@ fn test_error_invalid_secret_wrong_secret() {
 }
 
 #[test]
-#[should_panic(expected = "InvalidSecret")]
+#[should_panic(expected = "Error(Contract, #8)")]
 fn test_error_invalid_secret_empty_secret() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -370,7 +319,7 @@ fn test_error_invalid_secret_empty_secret() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "AlreadyClaimed")]
+#[should_panic(expected = "Error(Contract, #9)")]
 fn test_error_already_claimed_double_claim() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -380,7 +329,7 @@ fn test_error_already_claimed_double_claim() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -390,7 +339,7 @@ fn test_error_already_claimed_double_claim() {
 }
 
 #[test]
-#[should_panic(expected = "AlreadyRefunded")]
+#[should_panic(expected = "Error(Contract, #10)")]
 fn test_error_already_refunded_double_refund() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -408,7 +357,7 @@ fn test_error_already_refunded_double_refund() {
 }
 
 #[test]
-#[should_panic(expected = "AlreadyClaimed")]
+#[should_panic(expected = "Error(Contract, #9)")]
 fn test_error_already_claimed_cannot_refund() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -418,7 +367,7 @@ fn test_error_already_claimed_cannot_refund() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -435,7 +384,7 @@ fn test_error_already_claimed_cannot_refund() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "HTLCExpired")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn test_error_htlc_expired_claim_after_timeout() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -445,7 +394,7 @@ fn test_error_htlc_expired_claim_after_timeout() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 100;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -456,7 +405,7 @@ fn test_error_htlc_expired_claim_after_timeout() {
 }
 
 #[test]
-#[should_panic(expected = "HTLCExpired")]
+#[should_panic(expected = "Error(Contract, #6)")]
 fn test_error_htlc_expired_claim_at_exact_timeout() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -466,7 +415,7 @@ fn test_error_htlc_expired_claim_at_exact_timeout() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 100;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -481,7 +430,7 @@ fn test_error_htlc_expired_claim_at_exact_timeout() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "HTLCNotExpired")]
+#[should_panic(expected = "Error(Contract, #7)")]
 fn test_error_htlc_not_expired_refund_too_early() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -496,7 +445,7 @@ fn test_error_htlc_not_expired_refund_too_early() {
 }
 
 #[test]
-#[should_panic(expected = "HTLCNotExpired")]
+#[should_panic(expected = "Error(Contract, #7)")]
 fn test_error_htlc_not_expired_refund_before_timeout() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -517,7 +466,7 @@ fn test_error_htlc_not_expired_refund_before_timeout() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "OrderNotFound")]
+#[should_panic(expected = "Error(Contract, #13)")]
 fn test_error_order_not_found_get() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -528,7 +477,7 @@ fn test_error_order_not_found_get() {
 }
 
 #[test]
-#[should_panic(expected = "OrderNotFound")]
+#[should_panic(expected = "Error(Contract, #13)")]
 fn test_error_order_not_found_match() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -540,7 +489,7 @@ fn test_error_order_not_found_match() {
 }
 
 #[test]
-#[should_panic(expected = "OrderNotFound")]
+#[should_panic(expected = "Error(Contract, #13)")]
 fn test_error_order_not_found_cancel() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -556,7 +505,7 @@ fn test_error_order_not_found_cancel() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "OrderAlreadyMatched")]
+#[should_panic(expected = "Error(Contract, #14)")]
 fn test_error_order_already_matched_double_match() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -583,7 +532,7 @@ fn test_error_order_already_matched_double_match() {
 }
 
 #[test]
-#[should_panic(expected = "OrderAlreadyMatched")]
+#[should_panic(expected = "Error(Contract, #14)")]
 fn test_error_order_already_matched_cannot_cancel() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -613,7 +562,7 @@ fn test_error_order_already_matched_cannot_cancel() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "OrderExpired")]
+#[should_panic(expected = "Error(Contract, #15)")]
 fn test_error_order_expired_match_after_expiry() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -640,7 +589,7 @@ fn test_error_order_expired_match_after_expiry() {
 }
 
 #[test]
-#[should_panic(expected = "OrderExpired")]
+#[should_panic(expected = "Error(Contract, #15)")]
 fn test_error_order_expired_match_at_exact_expiry() {
     let (env, _, client) = setup_contract();
     let admin = Address::generate(&env);
@@ -680,7 +629,7 @@ fn test_htlc_claim_before_expiry() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 86400;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -759,8 +708,7 @@ fn test_order_cancel_before_match() {
         &expiry,
     );
 
-    let result = client.cancel_order(&creator, &order_id);
-    assert!(result.is_ok());
+    client.cancel_order(&creator, &order_id);
 }
 
 // =============================================================================
@@ -777,7 +725,7 @@ fn test_htlc_claim_one_second_before_expiry() {
     client.init(&admin);
 
     let secret = Bytes::from_slice(&env, &[1u8; 32]);
-    let hash_lock = env.crypto().sha256(&secret);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
     let time_lock = env.ledger().timestamp() + 100;
 
     let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
@@ -886,4 +834,756 @@ fn test_claim_different_htlcs_different_secrets() {
 
     assert_eq!(client.get_htlc_status(&htlc1_id), HTLCStatus::Claimed);
     assert_eq!(client.get_htlc_status(&htlc2_id), HTLCStatus::Claimed);
+}
+
+// =============================================================================
+// ISSUE #12: SECRET VERIFICATION AND HASH ALGORITHMS
+// =============================================================================
+
+#[test]
+fn test_keccak256_htlc_create_and_claim() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[0xabu8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().keccak256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    let htlc_id = client.create_htlc_with_algo(
+        &sender,
+        &receiver,
+        &1000,
+        &hash_lock,
+        &time_lock,
+        &HashAlgorithm::Keccak256,
+    );
+
+    client.claim_htlc(&receiver, &htlc_id, &secret);
+
+    assert_eq!(client.get_htlc_status(&htlc_id), HTLCStatus::Claimed);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_keccak256_htlc_rejects_sha256_secret() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[0xabu8; 32]);
+    // Lock with keccak256 but present the raw secret to a SHA256-locked HTLC equivalent
+    let keccak_hash: BytesN<32> = env.crypto().keccak256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    let htlc_id = client.create_htlc_with_algo(
+        &sender,
+        &receiver,
+        &1000,
+        &keccak_hash,
+        &time_lock,
+        &HashAlgorithm::SHA256,
+    );
+
+    // SHA256(secret) != keccak256(secret), so this must fail
+    client.claim_htlc(&receiver, &htlc_id, &secret);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_sha256_htlc_rejects_keccak256_secret() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[0x42u8; 32]);
+    let sha256_hash: BytesN<32> = env.crypto().sha256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    // Lock with SHA256 (default)
+    let htlc_id = client.create_htlc(&sender, &receiver, &1000, &sha256_hash, &time_lock);
+
+    // Build a keccak-based HTLC and try to claim the SHA256 one with the wrong hash
+    let wrong_hash = env.crypto().keccak256(&secret);
+    // Use wrong_hash as a secret that hashes to something different under SHA256
+    let wrong_secret = Bytes::from_array(&env, &wrong_hash.to_array());
+    client.claim_htlc(&receiver, &htlc_id, &wrong_secret);
+}
+
+#[test]
+fn test_generate_htlc_secret_returns_32_bytes() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret: BytesN<32> = client.generate_htlc_secret();
+    // BytesN<32> guarantees 32 bytes at compile time; verify it is non-zero
+    let arr = secret.to_array();
+    // With overwhelming probability the PRNG output is not all-zeros
+    let is_nonzero = arr.iter().any(|&b| b != 0);
+    assert!(is_nonzero);
+}
+
+#[test]
+fn test_sha256_htlc_stores_algorithm() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[1u8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
+    let htlc = client.get_htlc(&htlc_id);
+
+    assert_eq!(htlc.hash_algorithm, HashAlgorithm::SHA256);
+}
+
+#[test]
+fn test_keccak256_htlc_stores_algorithm() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[1u8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().keccak256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    let htlc_id = client.create_htlc_with_algo(
+        &sender,
+        &receiver,
+        &1000,
+        &hash_lock,
+        &time_lock,
+        &HashAlgorithm::Keccak256,
+    );
+    let htlc = client.get_htlc(&htlc_id);
+
+    assert_eq!(htlc.hash_algorithm, HashAlgorithm::Keccak256);
+}
+
+#[test]
+fn test_get_revealed_secret_after_claim() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[0x99u8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 86400;
+
+    let htlc_id = client.create_htlc(&sender, &receiver, &1000, &hash_lock, &time_lock);
+
+    assert_eq!(client.get_secret(&htlc_id), None);
+
+    client.claim_htlc(&receiver, &htlc_id, &secret);
+
+    assert_eq!(client.get_secret(&htlc_id), Some(secret));
+}
+
+// =============================================================================
+// ISSUE #16: ORDER MATCHING ALGORITHM
+// =============================================================================
+
+#[test]
+fn test_partial_fill_order_stays_open() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    // min_fill_amount = 250, from_amount = 1000
+    let order_id = client.create_order_with_min_fill(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+        &250,
+    );
+
+    client.match_order_partial(&counterparty, &order_id, &250);
+
+    let order = client.get_order(&order_id);
+    // Still open - only 250 of 1000 filled
+    assert_eq!(order.status, crate::types::SwapStatus::Open);
+    assert_eq!(order.filled_amount, 250);
+}
+
+#[test]
+fn test_partial_fill_multiple_fills_completes_order() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let cp1 = Address::generate(&env);
+    let cp2 = Address::generate(&env);
+    let cp3 = Address::generate(&env);
+    let cp4 = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order_with_min_fill(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+        &250,
+    );
+
+    client.match_order_partial(&cp1, &order_id, &250);
+    client.match_order_partial(&cp2, &order_id, &250);
+    client.match_order_partial(&cp3, &order_id, &250);
+    client.match_order_partial(&cp4, &order_id, &250);
+
+    let order = client.get_order(&order_id);
+    assert_eq!(order.status, crate::types::SwapStatus::Completed);
+    assert_eq!(order.filled_amount, 1000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_partial_fill_below_min_fill_rejected() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order_with_min_fill(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+        &250,
+    );
+
+    // 249 < min_fill_amount (250)
+    client.match_order_partial(&counterparty, &order_id, &249);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_partial_fill_above_remaining_rejected() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order_with_min_fill(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+        &250,
+    );
+
+    // 1001 > from_amount (1000)
+    client.match_order_partial(&counterparty, &order_id, &1001);
+}
+
+#[test]
+fn test_chain_pair_index_populated_on_create() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    let ids = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    assert_eq!(ids.len(), 1);
+    assert_eq!(ids.get(0).unwrap(), order_id);
+}
+
+#[test]
+fn test_chain_pair_index_removed_on_full_match() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    client.match_order(&counterparty, &order_id);
+
+    let ids = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    assert_eq!(ids.len(), 0);
+}
+
+#[test]
+fn test_chain_pair_index_removed_on_cancel() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    client.cancel_order(&creator, &order_id);
+
+    let ids = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    assert_eq!(ids.len(), 0);
+}
+
+#[test]
+fn test_expire_order_removes_from_index() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 100;
+    let order_id = client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    env.ledger().set_timestamp(expiry + 1);
+    client.expire_order(&order_id);
+
+    let order = client.get_order(&order_id);
+    assert_eq!(order.status, crate::types::SwapStatus::Expired);
+
+    let ids = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    assert_eq!(ids.len(), 0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #12)")]
+fn test_expire_order_before_expiry_fails() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    client.expire_order(&order_id);
+}
+
+#[test]
+fn test_multiple_orders_same_chain_pair() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator1 = Address::generate(&env);
+    let creator2 = Address::generate(&env);
+    let creator3 = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+
+    let id1 = client.create_order(
+        &creator1,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+    let id2 = client.create_order(
+        &creator2,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &2000,
+        &3800,
+        &expiry,
+    );
+    let id3 = client.create_order(
+        &creator3,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &500,
+        &1050,
+        &expiry,
+    );
+
+    let ids = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    assert_eq!(ids.len(), 3);
+    assert_eq!(ids.get(0).unwrap(), id1);
+    assert_eq!(ids.get(1).unwrap(), id2);
+    assert_eq!(ids.get(2).unwrap(), id3);
+}
+
+#[test]
+fn test_orders_different_chain_pairs_isolated() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+
+    client.create_order(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+    client.create_order(
+        &creator,
+        &Chain::Solana,
+        &Chain::Polygon,
+        &String::from_str(&env, "SOL"),
+        &String::from_str(&env, "MATIC"),
+        &1000,
+        &5000,
+        &expiry,
+    );
+
+    let btc_eth = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Ethereum);
+    let sol_matic = client.get_orders_by_chain_pair(&Chain::Solana, &Chain::Polygon);
+    let btc_sol = client.get_orders_by_chain_pair(&Chain::Bitcoin, &Chain::Solana);
+
+    assert_eq!(btc_eth.len(), 1);
+    assert_eq!(sol_matic.len(), 1);
+    assert_eq!(btc_sol.len(), 0);
+}
+
+// =============================================================================
+// ISSUE #10: INTEGRATION TESTING FRAMEWORK
+// =============================================================================
+
+/// Full atomic swap flow: Stellar HTLC locked, claimed cross-chain, secret revealed.
+#[test]
+fn test_full_atomic_swap_flow() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.init(&admin);
+
+    // Alice creates an order to sell BTC for ETH
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order(
+        &alice,
+        &Chain::Bitcoin,
+        &Chain::Ethereum,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "ETH"),
+        &1000,
+        &2000,
+        &expiry,
+    );
+
+    // Bob matches Alice's order
+    let swap_id = client.match_order(&bob, &order_id);
+    assert!(swap_id > 0);
+
+    // Alice creates HTLC to lock funds for Bob
+    let secret = Bytes::from_slice(&env, &[0x11u8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 7200;
+    let htlc_id = client.create_htlc(&alice, &bob, &1000, &hash_lock, &time_lock);
+
+    // Bob claims the HTLC by revealing the secret
+    client.claim_htlc(&bob, &htlc_id, &secret);
+
+    // Verify final state
+    assert_eq!(client.get_htlc_status(&htlc_id), HTLCStatus::Claimed);
+    assert_eq!(client.get_secret(&htlc_id), Some(secret));
+}
+
+/// Cross-chain swap using Keccak256 (Ethereum-compatible).
+#[test]
+fn test_ethereum_compatible_swap_keccak256() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let stellar_party = Address::generate(&env);
+    let eth_party = Address::generate(&env);
+
+    client.init(&admin);
+
+    let secret = Bytes::from_slice(&env, &[0xdeu8; 32]);
+    let hash_lock: BytesN<32> = env.crypto().keccak256(&secret).into();
+    let time_lock = env.ledger().timestamp() + 3600;
+
+    let htlc_id = client.create_htlc_with_algo(
+        &stellar_party,
+        &eth_party,
+        &5000,
+        &hash_lock,
+        &time_lock,
+        &HashAlgorithm::Keccak256,
+    );
+
+    client.claim_htlc(&eth_party, &htlc_id, &secret);
+    assert_eq!(client.get_htlc_status(&htlc_id), HTLCStatus::Claimed);
+}
+
+/// Multi-party partial fill: 5 different counterparties each fill 200 of 1000.
+#[test]
+fn test_multi_party_partial_fill() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let order_id = client.create_order_with_min_fill(
+        &creator,
+        &Chain::Bitcoin,
+        &Chain::Solana,
+        &String::from_str(&env, "BTC"),
+        &String::from_str(&env, "SOL"),
+        &1000,
+        &15000,
+        &expiry,
+        &200,
+    );
+
+    for _ in 0..5 {
+        let cp = Address::generate(&env);
+        client.match_order_partial(&cp, &order_id, &200);
+    }
+
+    let order = client.get_order(&order_id);
+    assert_eq!(order.status, crate::types::SwapStatus::Completed);
+    assert_eq!(order.filled_amount, 1000);
+}
+
+/// Refund path: HTLC times out and sender reclaims funds.
+#[test]
+fn test_htlc_timeout_and_refund() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let htlc_id = create_test_htlc(&env, &client, &sender, &receiver, 5000, &[0x55u8; 32], 100);
+
+    // Advance past timeout
+    env.ledger().set_timestamp(env.ledger().timestamp() + 101);
+
+    client.refund_htlc(&sender, &htlc_id);
+    assert_eq!(client.get_htlc_status(&htlc_id), HTLCStatus::Refunded);
+}
+
+/// Stress test: create 20 HTLCs and claim/refund alternately.
+#[test]
+fn test_stress_20_htlcs() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    client.init(&admin);
+
+    let mut htlc_ids = soroban_sdk::Vec::new(&env);
+
+    for i in 0u8..20 {
+        let secret = Bytes::from_slice(&env, &[i; 32]);
+        let hash_lock: BytesN<32> = env.crypto().sha256(&secret).into();
+        let time_lock = env.ledger().timestamp() + 86400;
+        let htlc_id = client.create_htlc(
+            &sender,
+            &receiver,
+            &((i as i128 + 1) * 100),
+            &hash_lock,
+            &time_lock,
+        );
+        htlc_ids.push_back(htlc_id);
+    }
+
+    // Claim even-indexed HTLCs, skip odd (leave active)
+    for i in 0u8..20 {
+        if i % 2 == 0 {
+            let htlc_id = htlc_ids.get(i as u32).unwrap();
+            let secret = Bytes::from_slice(&env, &[i; 32]);
+            client.claim_htlc(&receiver, &htlc_id, &secret);
+            assert_eq!(client.get_htlc_status(&htlc_id), HTLCStatus::Claimed);
+        }
+    }
+
+    let metrics = client.get_storage_metrics();
+    assert_eq!(metrics.total_htlcs, 20);
+    assert_eq!(metrics.active_htlcs, 10);
+}
+
+/// Stress test: create 10 orders on the same chain pair and verify index integrity.
+#[test]
+fn test_stress_10_orders_chain_pair_index() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+    let mut created_ids = soroban_sdk::Vec::new(&env);
+
+    for _ in 0..10 {
+        let creator = Address::generate(&env);
+        let order_id = client.create_order(
+            &creator,
+            &Chain::Ethereum,
+            &Chain::BSC,
+            &String::from_str(&env, "ETH"),
+            &String::from_str(&env, "BNB"),
+            &1000,
+            &3000,
+            &expiry,
+        );
+        created_ids.push_back(order_id);
+    }
+
+    let indexed = client.get_orders_by_chain_pair(&Chain::Ethereum, &Chain::BSC);
+    assert_eq!(indexed.len(), 10);
+
+    // Cancel 3 orders and verify they are removed from the index
+    for i in 0u32..3 {
+        let order_id = created_ids.get(i).unwrap();
+        let order = client.get_order(&order_id);
+        client.cancel_order(&order.creator, &order_id);
+    }
+
+    let remaining = client.get_orders_by_chain_pair(&Chain::Ethereum, &Chain::BSC);
+    assert_eq!(remaining.len(), 7);
+}
+
+/// Verify `get_storage_metrics` accurately reflects open orders.
+#[test]
+fn test_storage_metrics_reflect_open_orders() {
+    let (env, _, client) = setup_contract();
+    let admin = Address::generate(&env);
+    let creator = Address::generate(&env);
+    let counterparty = Address::generate(&env);
+
+    client.init(&admin);
+
+    let expiry = env.ledger().timestamp() + 86400;
+
+    // Create 3 orders
+    let ids: [u64; 3] = core::array::from_fn(|_| {
+        client.create_order(
+            &creator,
+            &Chain::Bitcoin,
+            &Chain::Ethereum,
+            &String::from_str(&env, "BTC"),
+            &String::from_str(&env, "ETH"),
+            &1000,
+            &2000,
+            &expiry,
+        )
+    });
+
+    let metrics_before = client.get_storage_metrics();
+    assert_eq!(metrics_before.open_orders, 3);
+
+    // Match one order
+    client.match_order(&counterparty, &ids[0]);
+
+    let metrics_after = client.get_storage_metrics();
+    assert_eq!(metrics_after.open_orders, 2);
+    assert_eq!(metrics_after.total_orders, 3);
 }
