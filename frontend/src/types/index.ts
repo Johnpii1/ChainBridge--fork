@@ -247,3 +247,21 @@ export interface CEXComparison {
   total_receive: number;
   savings_vs_cex: number;
 }
+
+// Dashboard types (#119)
+export type ChainStatus = "operational" | "degraded" | "down";
+
+export interface ChainHealth {
+  chain: string;
+  status: ChainStatus;
+  latency: number;
+  blockHeight: number;
+}
+
+export interface ProtocolStats {
+  totalVolume: string;
+  activeSwaps: number;
+  totalSwaps: number;
+  avgSettlementTime: string;
+  chains: ChainHealth[];
+}

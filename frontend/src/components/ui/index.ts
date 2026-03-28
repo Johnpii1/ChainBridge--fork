@@ -6,3 +6,5 @@ export { Modal } from "./modal";
 export { Spinner, LoadingState, Skeleton } from "./spinner";
 export { Toast, ToastContainer } from "./toast";
 export type { ToastType } from "./toast";
+export { ToastProvider } from "./ToastProvider";
+export { CopyButton } from "./CopyButton";

@@ -9,6 +9,7 @@ import { WalletConnect } from "../swap/WalletConnect";
 import { Layers, Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
+  { name: "Dashboard", href: "/dashboard" },
   { name: "Swap", href: "/swap" },
   { name: "Market", href: "/marketplace" },
   { name: "Orders", href: "/orders" },
