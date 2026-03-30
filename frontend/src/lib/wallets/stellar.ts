@@ -1,9 +1,27 @@
 import freighter from "@stellar/freighter-api";
-const { isConnected, getPublicKey, signTransaction } = freighter;
-
 import { Horizon } from "@stellar/stellar-sdk";
 import { WalletAdapter } from "@/types/wallet";
 import config from "@/lib/config";
+
+type FreighterApi = {
+  isConnected?: () => Promise<boolean | { isConnected?: boolean; error?: string }>;
+  getPublicKey?: () => Promise<string>;
+  getNetwork?: () => Promise<string | { network?: string; networkPassphrase?: string }>;
+  signTransaction?: (xdr: string, options: { network: string }) => Promise<any>;
+};
+
+const freighterApi = freighter as FreighterApi;
+
+function normalizeNetwork(network: string | null | undefined): string | null {
+  if (!network) return null;
+
+  const value = network.toLowerCase();
+  if (value.includes("public") || value.includes("mainnet")) return "mainnet";
+  if (value.includes("testnet")) return "testnet";
+  if (value.includes("future")) return "futurenet";
+
+  return value;
+}
 
 export class StellarAdapter implements WalletAdapter {
   private horizon: Horizon.Server;
@@ -13,17 +31,34 @@ export class StellarAdapter implements WalletAdapter {
   }
 
   async connect() {
-    const connected = await isConnected();
-    if (!connected) {
+    const connectionState = await freighterApi.isConnected?.();
+    const connected =
+      typeof connectionState === "boolean"
+        ? connectionState
+        : Boolean(connectionState?.isConnected);
+
+    if (!connected || !freighterApi.getPublicKey) {
       throw new Error("Freighter wallet not found or disconnected");
     }
 
-    const publicKey = await getPublicKey();
+    const publicKey = await freighterApi.getPublicKey();
     if (!publicKey) {
       throw new Error("Failed to get Stellar public key");
     }
 
-    return { address: publicKey, publicKey };
+    const networkResult = await freighterApi.getNetwork?.();
+    const network =
+      typeof networkResult === "string"
+        ? normalizeNetwork(networkResult)
+        : normalizeNetwork(networkResult?.network || networkResult?.networkPassphrase);
+
+    return {
+      address: publicKey,
+      publicKey,
+      network,
+      walletName: "Freighter",
+      isUnsupportedNetwork: Boolean(network && network !== config.stellar.network),
+    };
   }
 
   async disconnect() {
@@ -31,7 +66,11 @@ export class StellarAdapter implements WalletAdapter {
   }
 
   async signTransaction(tx: any) {
-    const signedTx = await signTransaction(tx.toXDR(), {
+    if (!freighterApi.signTransaction) {
+      throw new Error("Freighter signing is unavailable");
+    }
+
+    const signedTx = await freighterApi.signTransaction(tx.toXDR(), {
       network: config.stellar.network.toUpperCase(),
     });
     return signedTx;

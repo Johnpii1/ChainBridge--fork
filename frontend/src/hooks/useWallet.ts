@@ -9,6 +9,9 @@ export const useWalletStore = create<WalletStore>()(
       address: null,
       publicKey: null,
       chain: null,
+      network: null,
+      walletName: null,
+      isUnsupportedNetwork: false,
       isConnected: false,
       isConnecting: false,
       balance: null,
@@ -18,13 +21,17 @@ export const useWalletStore = create<WalletStore>()(
         set({ isConnecting: true, error: null });
         try {
           const adapter = getAdapter(chain);
-          const { address, publicKey } = await adapter.connect();
+          const { address, publicKey, network, walletName, isUnsupportedNetwork } =
+            await adapter.connect();
           const balance = await adapter.getBalance(address);
 
           set({
             address,
             publicKey,
             chain,
+            network: network ?? null,
+            walletName: walletName ?? null,
+            isUnsupportedNetwork: Boolean(isUnsupportedNetwork),
             isConnected: true,
             isConnecting: false,
             balance,
@@ -38,11 +45,19 @@ export const useWalletStore = create<WalletStore>()(
         }
       },
 
-      disconnect: () => {
+      disconnect: async () => {
+        const { chain } = get();
+        if (chain) {
+          await getAdapter(chain).disconnect();
+        }
+
         set({
           address: null,
           publicKey: null,
           chain: null,
+          network: null,
+          walletName: null,
+          isUnsupportedNetwork: false,
           isConnected: false,
           balance: null,
           error: null,
@@ -58,6 +73,9 @@ export const useWalletStore = create<WalletStore>()(
         address: state.address,
         publicKey: state.publicKey,
         chain: state.chain,
+        network: state.network,
+        walletName: state.walletName,
+        isUnsupportedNetwork: state.isUnsupportedNetwork,
         isConnected: state.isConnected,
       }),
     }
