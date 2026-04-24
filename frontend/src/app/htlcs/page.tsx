@@ -83,6 +83,7 @@ export default function HTLCStatusPage() {
   const [refundTarget, setRefundTarget] = useState<HTLCRecord | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Set<string>>(new Set());
   const transactions = useTransactionStore((state) => state.transactions);
   const addTransaction = useTransactionStore((state) => state.addTransaction);
   const updateTransaction = useTransactionStore((state) => state.updateTransaction);
@@ -182,6 +183,9 @@ export default function HTLCStatusPage() {
     setClaimTxId(txId);
     setClaimExplorerUrl(explorerUrl);
 
+    const originalHtlcs = htlcs;
+    setOptimisticUpdates((prev) => new Set(prev).add(selected.id));
+
     const basePayload = {
       hash: selected.onchain_id ?? "pending",
       chain: "Stellar",
@@ -255,6 +259,7 @@ export default function HTLCStatusPage() {
         claimError?.response?.data?.detail ??
         "Set NEXT_PUBLIC_CHAINBRIDGE_API_KEY to enable claim actions.";
       setClaimError(message);
+      setHtlcs(originalHtlcs);
       updateTransaction(txId, {
         status: TransactionStatus.FAILED,
         failureReason: message,
@@ -271,12 +276,35 @@ export default function HTLCStatusPage() {
       });
     } finally {
       setActionLoading(false);
+      setOptimisticUpdates((prev) => {
+        const next = new Set(prev);
+        next.delete(selected.id);
+        return next;
+      });
     }
   }
 
   async function handleRefund() {
     if (!refundTarget) return;
     setActionLoading(true);
+    const originalHtlcs = htlcs;
+    setOptimisticUpdates((prev) => new Set(prev).add(refundTarget.id));
+
+    setHtlcs((current) =>
+      current.map((item) =>
+        item.id === refundTarget.id
+          ? {
+              ...item,
+              status: "refunded",
+              can_claim: false,
+              can_refund: false,
+              phase: "refunded",
+              seconds_remaining: 0,
+            }
+          : item
+      )
+    );
+
     try {
       const refunded = await refundHTLC(refundTarget.id);
       setHtlcs((current) =>
@@ -302,6 +330,7 @@ export default function HTLCStatusPage() {
       setRefundTarget(null);
       await loadHTLCs(false);
     } catch (refundError: any) {
+      setHtlcs(originalHtlcs);
       pushToast({
         type: "error",
         title: "Refund failed",
@@ -311,6 +340,11 @@ export default function HTLCStatusPage() {
       });
     } finally {
       setActionLoading(false);
+      setOptimisticUpdates((prev) => {
+        const next = new Set(prev);
+        next.delete(refundTarget.id);
+        return next;
+      });
     }
   }
 
@@ -466,14 +500,27 @@ export default function HTLCStatusPage() {
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedId(item.id)}
+                  disabled={optimisticUpdates.has(item.id)}
                   className={cn(
-                    "w-full rounded-2xl border p-5 text-left transition-all",
+                    "w-full rounded-2xl border p-5 text-left transition-all relative",
                     "bg-surface-raised hover:border-brand-500/40 hover:shadow-glow-sm",
                     selected?.id === item.id
                       ? "border-brand-500/50 shadow-glow-sm"
-                      : "border-border"
+                      : "border-border",
+                    optimisticUpdates.has(item.id) && "opacity-60 pointer-events-none"
                   )}
                 >
+                  {optimisticUpdates.has(item.id) && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/5 backdrop-blur-sm">
+                      <div className="flex flex-col items-center gap-2">
+                        <svg className="h-5 w-5 animate-spin text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-xs font-medium text-text-primary">Processing...</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-4">
                     <div className="grid gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted sm:grid-cols-5">
                       <span>Status</span>
