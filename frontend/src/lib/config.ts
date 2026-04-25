@@ -46,6 +46,8 @@ export const config = {
   features: {
     ordersEnabled: getEnv("NEXT_PUBLIC_FEATURE_ORDERS_ENABLED", "true") === "true",
     swapsEnabled: getEnv("NEXT_PUBLIC_FEATURE_SWAPS_ENABLED", "true") === "true",
+    swapWebsocketEnabled:
+      getEnv("NEXT_PUBLIC_FEATURE_SWAP_WS_ENABLED", "false") === "true",
   },
 } as const;
 
