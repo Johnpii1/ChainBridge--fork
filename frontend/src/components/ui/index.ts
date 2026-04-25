@@ -12,3 +12,7 @@ export { ToastProvider } from "./ToastProvider";
 export { CopyButton } from "./CopyButton";
 export { EmptyState } from "./empty-state";
 export { PaginationControls } from "./PaginationControls";
+export { DataTable } from "./data-table";
+export type { ColumnDef } from "./data-table";
+export { FullPageError, InlineError } from "./error-state";
+export type { ErrorKind } from "./error-state";

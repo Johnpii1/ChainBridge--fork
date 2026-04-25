@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from "lucide-react";
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -38,37 +38,52 @@ export function Toast({
   onDismiss,
 }: ToastProps) {
   const [visible, setVisible] = useState(true);
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+
+  const dismiss = () => {
+    setVisible(false);
+    setTimeout(() => dismissRef.current(id), 300);
+  };
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      setVisible(false);
-      setTimeout(() => onDismiss(id), 300);
-    }, duration);
+    const t = setTimeout(dismiss, duration);
     return () => clearTimeout(t);
-  }, [id, duration, onDismiss]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, duration]);
+
+  // Keyboard: dismiss on Escape when focused inside the toast
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") dismiss();
+  };
 
   return (
     <div
+      role="alert"
+      aria-live={type === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
       className={cn(
         "flex items-start gap-3 rounded-2xl border bg-surface-raised p-4 shadow-card-dark",
-        "transition-all duration-300",
+        "transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2",
         BORDER_COLORS[type]
       )}
     >
-      <div className="shrink-0 mt-0.5">{ICONS[type]}</div>
+      <div className="shrink-0 mt-0.5" aria-hidden="true">
+        {ICONS[type]}
+      </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-text-primary">{title}</p>
         {message && <p className="mt-0.5 text-xs text-text-secondary">{message}</p>}
       </div>
       <button
-        onClick={() => {
-          setVisible(false);
-          setTimeout(() => onDismiss(id), 300);
-        }}
-        className="shrink-0 rounded-lg p-0.5 text-text-muted hover:text-text-primary transition"
+        onClick={dismiss}
+        aria-label="Dismiss notification"
+        className="shrink-0 rounded-lg p-0.5 text-text-muted hover:text-text-primary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <X className="h-4 w-4" />
+        <X className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -83,7 +98,10 @@ export function ToastContainer({
   onDismiss: (id: string) => void;
 }) {
   return (
-    <div className="fixed bottom-6 right-6 z-[999] flex flex-col gap-3 w-80">
+    <div
+      aria-label="Notifications"
+      className="fixed bottom-6 right-6 z-[999] flex flex-col gap-3 w-80"
+    >
       {toasts.map((toast) => (
         <Toast key={toast.id} {...toast} onDismiss={onDismiss} />
       ))}
