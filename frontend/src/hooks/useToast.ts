@@ -20,13 +20,19 @@ interface ToastStore {
 
 let counter = 0;
 
+/** Dedup key: same type + title within the active toast list = duplicate */
+function isDuplicate(toasts: ToastItem[], incoming: Omit<ToastItem, "id">): boolean {
+  return toasts.some((t) => t.type === incoming.type && t.title === incoming.title);
+}
+
 export const useToastStore = create<ToastStore>((set) => ({
   toasts: [],
   addToast: (toast) => {
-    const id = `toast-${Date.now()}-${++counter}`;
-    set((state) => ({
-      toasts: [...state.toasts.slice(-4), { ...toast, id }],
-    }));
+    set((state) => {
+      if (isDuplicate(state.toasts, toast)) return state; // suppress duplicate
+      const id = `toast-${Date.now()}-${++counter}`;
+      return { toasts: [...state.toasts.slice(-4), { ...toast, id }] };
+    });
   },
   dismissToast: (id) => {
     set((state) => ({
@@ -43,13 +49,9 @@ export function useToast() {
     toast: addToast,
     dismiss: dismissToast,
     clearAll,
-    success: (title: string, message?: string) =>
-      addToast({ type: "success", title, message }),
-    error: (title: string, message?: string) =>
-      addToast({ type: "error", title, message }),
-    info: (title: string, message?: string) =>
-      addToast({ type: "info", title, message }),
-    warning: (title: string, message?: string) =>
-      addToast({ type: "warning", title, message }),
+    success: (title: string, message?: string) => addToast({ type: "success", title, message }),
+    error: (title: string, message?: string) => addToast({ type: "error", title, message }),
+    info: (title: string, message?: string) => addToast({ type: "info", title, message }),
+    warning: (title: string, message?: string) => addToast({ type: "warning", title, message }),
   };
 }

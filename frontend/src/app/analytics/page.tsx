@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { Card, Badge } from "@/components/ui";
-import { BarChart } from "@/components/admin/BarChart";
+import { LineChart, BarChartWrapper, DonutChart } from "@/components/charts";
 
 type VolumePeriod = "24h" | "7d" | "30d";
 
-const DATA: Record<VolumePeriod, Array<{ timestamp: string; volume: number; order_count: number }>> = {
+const RAW_DATA: Record<
+  VolumePeriod,
+  Array<{ timestamp: string; volume: number; order_count: number }>
+> = {
   "24h": Array.from({ length: 24 }, (_, i) => ({
     timestamp: new Date(Date.now() - (23 - i) * 3_600_000).toISOString(),
     volume: 40_000 + (i % 6) * 12_500 + i * 900,
@@ -24,14 +27,46 @@ const DATA: Record<VolumePeriod, Array<{ timestamp: string; volume: number; orde
   })),
 };
 
+const CHAIN_SLICES = [
+  { label: "Stellar", value: 42, color: "#14b8a6" },
+  { label: "Ethereum", value: 31, color: "#6366f1" },
+  { label: "Bitcoin", value: 18, color: "#f97316" },
+  { label: "Solana", value: 9, color: "#a855f7" },
+];
+
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState<VolumePeriod>("7d");
-  const buckets = DATA[period];
+  const buckets = RAW_DATA[period];
 
-  const totalVolume = useMemo(
-    () => buckets.reduce((sum, bucket) => sum + bucket.volume, 0),
-    [buckets],
+  const totalVolume = useMemo(() => buckets.reduce((sum, b) => sum + b.volume, 0), [buckets]);
+
+  const lineSeries = useMemo(
+    () => [
+      {
+        label: "Volume",
+        data: buckets.map((b) => ({ x: new Date(b.timestamp).getTime(), y: b.volume })),
+        color: "#14b8a6",
+      },
+    ],
+    [buckets]
   );
+
+  const barData = useMemo(
+    () =>
+      buckets.map((b) => ({
+        label:
+          period === "24h"
+            ? new Date(b.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : new Date(b.timestamp).toLocaleDateString([], { month: "short", day: "numeric" }),
+        value: b.order_count,
+      })),
+    [buckets, period]
+  );
+
+  const fmtX = (x: string | number) =>
+    period === "24h"
+      ? new Date(Number(x)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : new Date(Number(x)).toLocaleDateString([], { month: "short", day: "numeric" });
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-10 space-y-6">
@@ -39,19 +74,20 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-text-primary">Analytics</h1>
           <p className="text-sm text-text-secondary mt-1">
-            Swap volume charting across rolling time windows.
+            Swap volume and order activity across rolling time windows.
           </p>
         </div>
-        <Badge variant="info">Issue #152</Badge>
+        <Badge variant="info">Issues #169 · #168</Badge>
       </div>
 
+      {/* Period selector */}
       <Card className="p-4">
         <div className="flex flex-wrap gap-2">
           {(["24h", "7d", "30d"] as const).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 period === p
                   ? "bg-brand-500/10 text-brand-500 border border-brand-500/30"
                   : "bg-surface-overlay text-text-secondary border border-border"
@@ -60,24 +96,41 @@ export default function AnalyticsPage() {
               {p}
             </button>
           ))}
-          <span className="ml-auto text-xs text-text-muted">
-            Total volume: ${totalVolume.toLocaleString()}
+          <span className="ml-auto text-xs text-text-muted self-center">
+            Total: ${totalVolume.toLocaleString()}
           </span>
         </div>
       </Card>
 
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Line chart – volume trend */}
+        <Card className="p-6 lg:col-span-2">
+          <p className="text-sm font-semibold text-text-primary mb-4">Volume Trend</p>
+          <LineChart
+            series={lineSeries}
+            height={220}
+            formatX={fmtX}
+            formatY={(v) => `$${v.toLocaleString()}`}
+          />
+        </Card>
+
+        {/* Donut – chain distribution */}
+        <Card className="p-6 flex flex-col items-center">
+          <p className="text-sm font-semibold text-text-primary mb-4 self-start">Chain Mix</p>
+          <DonutChart
+            slices={CHAIN_SLICES}
+            size={160}
+            thickness={32}
+            centerLabel="100%"
+            centerSub="volume"
+          />
+        </Card>
+      </div>
+
+      {/* Bar chart – order count */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Swap Volume Chart</h2>
-        <BarChart
-          buckets={buckets}
-          height={260}
-          formatX={(timestamp) =>
-            period === "24h"
-              ? new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : new Date(timestamp).toLocaleDateString([], { month: "short", day: "numeric" })
-          }
-          formatValue={(value) => `$${value.toLocaleString()}`}
-        />
+        <p className="text-sm font-semibold text-text-primary mb-4">Order Count</p>
+        <BarChartWrapper data={barData} height={200} formatValue={(v) => `${v} orders`} />
       </Card>
     </div>
   );
