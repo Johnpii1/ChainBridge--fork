@@ -31,15 +31,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
-            aria-invalid={error ? true : undefined}
+            aria-invalid={error ? "true" : "false"}
             aria-describedby={describedBy}
             className={cn(
               "w-full rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-text-primary",
               "placeholder:text-text-muted",
-              "transition-all duration-150",
+              "transition-all duration-[var(--motion-fast)] ease-[var(--easing-standard)]",
               "focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent",
               "disabled:opacity-50 disabled:cursor-not-allowed",
-              error && "border-red-500/50 focus:ring-red-500/50",
+              error && "border-status-error/50 focus:ring-status-error/50",
               leftElement && "pl-10",
               rightElement && "pr-10",
               className
@@ -51,7 +51,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p id={errorId} role="alert" className="text-xs text-red-400">
+          <p id={errorId} role="alert" className="text-xs text-status-error">
             {error}
           </p>
         )}

@@ -19,7 +19,7 @@ const variantStyles: Record<Variant, string> = {
     "bg-surface-raised border border-border text-text-primary hover:bg-surface-overlay hover:border-brand-500/50",
   ghost: "text-text-secondary hover:text-text-primary hover:bg-surface-raised",
   danger:
-    "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40",
+    "bg-status-error/10 text-status-error border border-status-error/20 hover:bg-status-error/20 hover:border-status-error/40",
   outline: "border border-brand-500/50 text-brand-500 hover:bg-brand-500/10",
 };
 
@@ -50,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center rounded-xl font-medium",
-          "transition-all duration-150 ease-out",
+          "transition-all duration-[var(--motion-fast)] ease-[var(--easing-emphasized)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:opacity-50 disabled:pointer-events-none",
           variantStyles[variant],
