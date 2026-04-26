@@ -11,12 +11,12 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  locked_initiator: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  locked_responder: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-  completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
-  expired: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+  pending: "bg-status-warning/10 text-status-warning border-status-warning/20",
+  locked_initiator: "bg-status-info/10 text-status-info border-status-info/20",
+  locked_responder: "bg-accent/10 text-accent border-accent/20",
+  completed: "bg-status-success/10 text-status-success border-status-success/20",
+  cancelled: "bg-status-error/10 text-status-error border-status-error/20",
+  expired: "bg-text-muted/20 text-text-muted border-text-muted/30",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -30,10 +30,10 @@ const STATUS_LABELS: Record<string, string> = {
 
 const variantStyles: Record<BadgeVariant, string> = {
   default: "bg-surface-overlay text-text-secondary border-border",
-  success: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  warning: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  error: "bg-red-500/10 text-red-400 border-red-500/20",
-  info: "bg-brand-500/10 text-brand-500 border-brand-500/20",
+  success: "bg-status-success/10 text-status-success border-status-success/20",
+  warning: "bg-status-warning/10 text-status-warning border-status-warning/20",
+  error: "bg-status-error/10 text-status-error border-status-error/20",
+  info: "bg-status-info/10 text-status-info border-status-info/20",
   chain: "",
 };
 
