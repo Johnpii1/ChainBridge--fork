@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Order, OrderSide, OrderStatus } from "@/types";
 import { Badge, Button, Modal } from "@/components/ui";
-import { ArrowUpDown, Filter, Search, Zap, Eye } from "lucide-react";
+import { ArrowUpDown, Filter, Search, Zap, Eye, X } from "lucide-react";
 import { clsx } from "clsx";
 import { useUnifiedWallet } from "@/components/wallet/UnifiedWalletProvider";
 
@@ -82,10 +83,16 @@ export function OrderTakeModal({ order, isOpen, onClose, onConfirm }: OrderTakeM
 }
 
 export function OrderBookList({ orders, onTakeOrder }: OrderBookListProps) {
-  const [search, setSearch] = useState("");
-  const [sideFilter, setSideFilter] = useState<OrderSide | "all">("all");
-  const [chainPairFilter, setChainPairFilter] = useState("all");
-  const [assetFilter, setAssetFilter] = useState("all");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
+  const [sideFilter, setSideFilter] = useState<OrderSide | "all">(
+    () => (searchParams.get("side") as OrderSide | "all") ?? "all"
+  );
+  const [chainPairFilter, setChainPairFilter] = useState(() => searchParams.get("chain") ?? "all");
+  const [assetFilter, setAssetFilter] = useState(() => searchParams.get("asset") ?? "all");
   const [detailsOrder, setDetailsOrder] = useState<Order | null>(null);
   const [sortConfig, setSortConfig] = useState<{
     key: "price" | "amount" | "timestamp";
@@ -99,6 +106,39 @@ export function OrderBookList({ orders, onTakeOrder }: OrderBookListProps) {
   const assetOptions = useMemo(() => {
     return Array.from(new Set(orders.flatMap((order) => [order.tokenIn, order.tokenOut]))).sort();
   }, [orders]);
+
+  // Sync URL params with filter state
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    const updateParam = (key: string, value: string, defaultValue: string) => {
+      if (!value || value === defaultValue) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    };
+
+    updateParam("search", search.trim(), "");
+    updateParam("side", sideFilter, "all");
+    updateParam("chain", chainPairFilter, "all");
+    updateParam("asset", assetFilter, "all");
+
+    const currentUrl = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+    const targetUrl = `${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+
+    if (currentUrl !== targetUrl) {
+      router.replace(targetUrl, { scroll: false });
+    }
+  }, [search, sideFilter, chainPairFilter, assetFilter, pathname, router, searchParams]);
+
+  // Sync filter state with URL params on mount and URL changes
+  useEffect(() => {
+    setSearch(searchParams.get("search") ?? "");
+    setSideFilter((searchParams.get("side") as OrderSide | "all") ?? "all");
+    setChainPairFilter(searchParams.get("chain") ?? "all");
+    setAssetFilter(searchParams.get("asset") ?? "all");
+  }, [searchParams]);
 
   function parseNumericValue(value: string) {
     return Number(value.replace(/,/g, "")) || 0;
@@ -153,6 +193,16 @@ export function OrderBookList({ orders, onTakeOrder }: OrderBookListProps) {
     }
     setSortConfig({ key, direction });
   };
+
+  const resetFilters = () => {
+    setSearch("");
+    setSideFilter("all");
+    setChainPairFilter("all");
+    setAssetFilter("all");
+  };
+
+  const hasActiveFilters =
+    search.trim() !== "" || sideFilter !== "all" || chainPairFilter !== "all" || assetFilter !== "all";
 
   return (
     <div className="space-y-4">
@@ -214,6 +264,17 @@ export function OrderBookList({ orders, onTakeOrder }: OrderBookListProps) {
               </option>
             ))}
           </select>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              icon={<X size={14} />}
+              className="text-text-muted hover:text-text-primary"
+            >
+              Reset
+            </Button>
+          )}
         </div>
       </div>
 
@@ -329,12 +390,7 @@ export function OrderBookList({ orders, onTakeOrder }: OrderBookListProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setSearch("");
-                          setSideFilter("all");
-                          setChainPairFilter("all");
-                          setAssetFilter("all");
-                        }}
+                        onClick={resetFilters}
                       >
                         Clear Filters
                       </Button>
