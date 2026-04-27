@@ -11,6 +11,8 @@ import {
   Lock,
 } from "lucide-react";
 
+export const experimental_ppr = true;
+
 export default function Home() {
   return (
     <div className="flex flex-col">
@@ -41,18 +43,18 @@ export default function Home() {
             </p>
 
             <div className="mt-10 flex animate-fade-in flex-wrap items-center justify-center gap-4 [animation-delay:400ms]">
-              <Link href="/swap">
+              <Link href="/swap" prefetch={true}>
                 <Button size="lg" className="rounded-2xl px-8 shadow-glow-md">
                   Launch Swap Wizard
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/protocol">
+              <Link href="/protocol" prefetch={true}>
                 <Button variant="outline" size="lg" className="rounded-2xl px-8">
                   Explore Protocol
                 </Button>
               </Link>
-              <Link href="/about">
+              <Link href="/about" prefetch={true}>
                 <Button variant="secondary" size="lg" className="rounded-2xl px-8">
                   How it Works
                 </Button>
@@ -121,7 +123,7 @@ export default function Home() {
                 networks.
               </p>
               <div className="mt-8">
-                <Link href="/swap">
+                <Link href="/swap" prefetch={true}>
                   <Button variant="primary" size="lg" className="rounded-xl">
                     Connect and Swap <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
