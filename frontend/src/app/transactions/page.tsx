@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { TransactionFeed } from "@/components/transactions/TransactionFeed";
+import { Suspense, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useTransactionStore } from "@/hooks/useTransactions";
+import { TransactionFeedSkeleton } from "@/components/transactions/TransactionFeedSkeleton";
+
+const TransactionFeed = dynamic(
+  () => import("@/components/transactions/TransactionFeed").then((m) => m.TransactionFeed),
+  { loading: () => <TransactionFeedSkeleton rows={5} />, ssr: false }
+);
 import { Transaction, TransactionStatus } from "@/types";
 import { Activity, ShieldCheck, Zap } from "lucide-react";
 
@@ -107,7 +113,9 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      <TransactionFeed transactions={transactions} />
+      <Suspense fallback={<TransactionFeedSkeleton rows={5} />}>
+        <TransactionFeed transactions={transactions} />
+      </Suspense>
     </div>
   );
 }
