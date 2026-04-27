@@ -7,6 +7,7 @@ import { useI18n } from "@/components/i18n/I18nProvider";
 import { NAV_LINKS } from "./navigation";
 import { Layers, ChevronRight } from "lucide-react";
 import { stripLocaleFromPathname } from "@/lib/i18n/config";
+import { shouldPrefetch } from "@/lib/prefetch";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -39,6 +40,7 @@ export function Sidebar() {
               <li key={link.href}>
                 <Link
                   href={localizePath(link.href)}
+                  prefetch={shouldPrefetch(link.href, normalizedPathname)}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "group flex items-center justify-between rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
