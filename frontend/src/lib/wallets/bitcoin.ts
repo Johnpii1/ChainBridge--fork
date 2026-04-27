@@ -2,6 +2,25 @@ import { getAddress, signTransaction } from "sats-connect";
 import { WalletAdapter, WalletConnection } from "@/types/wallet";
 import config from "@/lib/config";
 
+type BitcoinAccountChangeCallback = (address: string | null) => void;
+
+const bitcoinAccountChangeCallbacks: Set<BitcoinAccountChangeCallback> = new Set();
+
+export function onBitcoinAccountChange(callback: BitcoinAccountChangeCallback): () => void {
+  bitcoinAccountChangeCallbacks.add(callback);
+  return () => bitcoinAccountChangeCallbacks.delete(callback);
+}
+
+function notifyBitcoinAccountChange(address: string | null) {
+  bitcoinAccountChangeCallbacks.forEach((cb) => {
+    try {
+      cb(address);
+    } catch {
+      // Ignore callback errors
+    }
+  });
+}
+
 // Internal interface implemented by each Bitcoin wallet provider
 interface BitcoinProviderAdapter {
   isAvailable(): boolean;
@@ -94,6 +113,8 @@ declare global {
       getPublicKey: () => Promise<string>;
       getBalance: () => Promise<{ total: number; confirmed: number; unconfirmed: number }>;
       signPsbt: (psbtHex: string, options?: any) => Promise<string>;
+      on?: (event: string, callback: (...args: any[]) => void) => void;
+      removeListener?: (event: string, callback: (...args: any[]) => void) => void;
     };
   }
 }
