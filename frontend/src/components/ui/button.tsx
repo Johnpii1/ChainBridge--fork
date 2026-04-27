@@ -29,9 +29,9 @@ const variantStyles: Record<ButtonVariant, string> = {
   secondary:
     "bg-surface-raised border border-border text-text-primary hover:bg-surface-overlay hover:border-brand-500/50 active:bg-surface-overlay focus-visible:ring-text-secondary",
   ghost: 
-    "text-text-secondary hover:text-text-primary hover:bg-surface-raised active:bg-surface-overlay focus-visible:ring-text-muted",
+    "text-text-primary hover:text-text-primary hover:bg-surface-raised active:bg-surface-overlay focus-visible:ring-text-muted",
   destructive:
-    "bg-status-error/10 text-status-error border border-status-error/20 hover:bg-status-error/20 hover:border-status-error/40 active:bg-status-error/30 focus-visible:ring-status-error",
+    "bg-status-error/15 text-status-error border border-status-error/25 hover:bg-status-error/25 hover:border-status-error/40 active:bg-status-error/35 focus-visible:ring-status-error",
   outline: 
     "border border-brand-500/50 text-brand-500 hover:bg-brand-500/10 active:bg-brand-500/20 focus-visible:ring-brand-500",
 };
