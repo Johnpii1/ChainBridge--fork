@@ -171,6 +171,24 @@ export default function SwapPage() {
     }
   };
 
+  useEffect(() => {
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setQuote(null);
+      setQuoteError(null);
+      setQuoteUpdatedAt(null);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void requestQuote();
+    }, 450);
+
+    return () => window.clearTimeout(timeout);
+  }, [amount, destChain, fromAsset, sourceChain, toAsset]);
+
+  const isQuoteStale = quoteUpdatedAt ? clockMs - quoteUpdatedAt > 30000 : false;
+
   const toAmount = quote?.rateQuote.to_amount
     ? formatTokenAmount(quote.rateQuote.to_amount, {
         minimumFractionDigits: 2,
@@ -179,7 +197,7 @@ export default function SwapPage() {
     : "";
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-12 md:py-20">
+    <div className="container mx-auto max-w-3xl px-4 py-12">
       <FeeWarningBanner chains={[sourceChain, destChain]} />
 
       <Card>
@@ -188,18 +206,40 @@ export default function SwapPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <Input value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <QuotePreviewCard quote={quote} isLoading={quoteLoading} isStale={false} />
+          <Input
+            placeholder="0.00"
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+
+          <QuotePreviewCard
+            quote={quote}
+            fromAsset={fromAsset}
+            toAsset={toAsset}
+            isLoading={quoteLoading}
+            isStale={isQuoteStale}
+            error={quoteError}
+            onRefresh={() => void requestQuote()}
+          />
+
           <TimelockConfigurator
             sourceChain={sourceChain}
             destChain={destChain}
             timelockHours={timelockHours}
             onTimelockChange={setTimelockHours}
           />
+
+          <SlippageExpirationControls
+            slippage={slippage}
+            expirationMinutes={expirationMinutes}
+            onSlippageChange={setSlippage}
+            onExpirationChange={setExpirationMinutes}
+          />
         </CardContent>
 
         <CardFooter>
-          <Button className="w-full">Initialize Swap</Button>
+          <Button className="w-full">Initialize Atomic Swap</Button>
         </CardFooter>
       </Card>
     </div>

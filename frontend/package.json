@@ -16,8 +16,16 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
+    "test:e2e:smoke": "playwright test smoke-tests.spec.ts",
+    "test:e2e:smoke:ci": "playwright test smoke-tests.spec.ts --reporter=list",
+    "test:visual": "chromatic --exit-zero-on-changes",
+    "test:visual:ci": "chromatic",
+    "test:visual:local": "storybook test",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "types:generate": "tsx scripts/generate-api-types.ts",
+    "types:check": "tsc --noEmit --project tsconfig.json",
+    "prebuild": "npm run types:generate"
   },
   "dependencies": {
     "@next/bundle-analyzer": "^16.2.4",
@@ -62,6 +70,11 @@
     "@storybook/addon-a11y": "^10.3.5",
     "@storybook/addon-docs": "^10.3.5",
     "@storybook/addon-onboarding": "^10.3.5",
-    "eslint-plugin-storybook": "^10.3.5"
+    "eslint-plugin-storybook": "^10.3.5",
+    "@storybook/test-runner": "^0.16.0",
+    "@storybook/addon-interactions": "^7.6.10",
+    "chromatic": "^11.5.6",
+    "playwright": "^1.44.0",
+    "tsx": "^4.7.2"
   }
 }
